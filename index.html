@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#05060a">
+<meta name="description" content="GARGANTUA · 卡冈图雅 — 基于 WebGL2 的实时黑洞渲染预览：引力透镜、吸积盘、多普勒集束与电影级后期参数控制。">
+<title>GARGANTUA · 卡冈图雅 — 黑洞实时预览</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ======================================================================
+     WebGL2 渲染表面（全屏）
+     ==================================================================== -->
+<canvas id="glcanvas" aria-label="黑洞实时渲染画布"></canvas>
+
+<!-- ======================================================================
+     首屏加载遮罩（BH.ui.hideLoading() 移除，6 秒后自动移除）
+     ==================================================================== -->
+<div id="loading" role="status" aria-live="polite">
+  <div class="loading-inner">
+    <div class="loading-mark" aria-hidden="true">
+      <span class="loading-ring"></span>
+      <span class="loading-glyph">◍</span>
+    </div>
+    <h1 class="loading-title">GARGANTUA</h1>
+    <p class="loading-sub">卡冈图雅 · 正在构建引力场</p>
+    <div class="loading-rule" aria-hidden="true"><i></i></div>
+    <p class="loading-note">COMPILING SHADERS · TRACING NULL GEODESICS</p>
+  </div>
+</div>
+
+<!-- ======================================================================
+     错误遮罩（默认隐藏；BH.ui.showError(title, detail) 显示）
+     ==================================================================== -->
+<div id="error-overlay" hidden>
+  <div class="error-card" role="alertdialog" aria-modal="true"
+       aria-labelledby="error-title" aria-describedby="error-detail">
+    <div class="error-glyph" aria-hidden="true">⚠</div>
+    <h2 id="error-title" class="error-title">无法启动渲染器</h2>
+    <p id="error-detail" class="error-detail">当前浏览器或显卡不支持 WebGL2。</p>
+    <button id="error-dismiss" class="btn btn-accent" type="button">仅浏览界面</button>
+  </div>
+</div>
+
+<!-- ======================================================================
+     参数侧栏
+     ==================================================================== -->
+<aside id="sidebar" aria-label="参数控制面板">
+
+  <header class="sidebar-head" id="sidebar-head">
+    <div class="brand">
+      <h1 class="brand-title">GARGANTUA</h1>
+      <p class="brand-sub">卡冈图雅 · 实时黑洞可视化</p>
+    </div>
+    <span class="brand-rule" aria-hidden="true"></span>
+  </header>
+
+  <div class="sidebar-scroll" id="sidebar-scroll">
+    <!-- 由 js/ui.js 依据 BH.GROUPS / BH.DEFS 生成 -->
+    <div id="groups"></div>
+  </div>
+
+  <footer class="sidebar-foot">
+    <button id="reset-all" class="btn btn-wide" type="button">
+      <span class="btn-glyph" aria-hidden="true">↺</span>
+      <span>恢复默认</span>
+    </button>
+    <div class="preset-block">
+      <span class="preset-label">预设</span>
+      <div id="presets" class="presets"></div>
+    </div>
+  </footer>
+
+</aside>
+
+<!-- 侧栏开合按钮 -->
+<button id="sidebar-toggle" type="button" aria-label="收起参数面板"
+        aria-expanded="true" aria-controls="sidebar">
+  <span class="toggle-icon" aria-hidden="true"></span>
+</button>
+
+<!-- 窄屏抽屉遮罩 -->
+<div id="sidebar-scrim" aria-hidden="true"></div>
+
+<!-- ======================================================================
+     HUD 遥测
+     ==================================================================== -->
+<div id="hud" aria-live="off">
+  <div class="hud-grid">
+    <span class="hud-k">FPS</span>
+    <span class="hud-v" id="hud-fps">—</span>
+
+    <span class="hud-k">内部渲染分辨率</span>
+    <span class="hud-v" id="hud-res">—</span>
+
+    <span class="hud-k">累积帧数</span>
+    <span class="hud-v" id="hud-samples">0/64</span>
+  </div>
+  <p class="hud-hint">拖动旋转 · 滚轮缩放 · 双击重置视角</p>
+</div>
+
+<noscript>
+  <div class="noscript">
+    <h2>需要启用 JavaScript</h2>
+    <p>本页使用 WebGL2 实时积分光线测地线，必须启用 JavaScript 才能运行。</p>
+  </div>
+</noscript>
+
+<!-- ======================================================================
+     脚本：严格按依赖顺序，全部为传统脚本（file:// 下 ES module 会被拦截）
+     ==================================================================== -->
+<script src="js/params.js"></script>
+<script src="js/shaders.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>

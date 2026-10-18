@@ -1,0 +1,20 @@
+# ---- 验证产物 / QA artifacts ----
+# 截图、headless Chrome profile、临时脚本都不进仓库
+.tmp/
+*.log
+
+# ---- 操作系统 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 编辑器 ----
+.vscode/
+.idea/
+*.swp
+*~
+
+# ---- 依赖 / 构建产物（本项目零依赖，这里只是防御性忽略）----
+node_modules/
+dist/
+build/

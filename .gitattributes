@@ -1,0 +1,18 @@
+# 统一换行符：仓库内一律用 LF，检出时也保持 LF
+* text=auto eol=lf
+
+# 二进制资源不做换行转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+
+# 这些是文本，但不要做 diff 猜测
+*.mjs text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+*.json text eol=lf
