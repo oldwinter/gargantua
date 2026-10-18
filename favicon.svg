@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="55%" stop-color="#ffd9a0" stop-opacity="0"/>
+      <stop offset="78%" stop-color="#ffb865" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffb865" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="64" height="64" fill="#05060a"/>
+
+  <!-- 吸积盘：横向的薄盘 -->
+  <ellipse cx="32" cy="32" rx="27" ry="4.6" fill="none" stroke="#ffb865" stroke-width="2.4" opacity="0.85"/>
+  <ellipse cx="32" cy="32" rx="27" ry="4.6" fill="none" stroke="#fff0d0" stroke-width="0.9" opacity="0.9"/>
+
+  <!-- 光子环的光晕 -->
+  <circle cx="32" cy="32" r="17" fill="url(#glow)"/>
+
+  <!-- 阴影 + 光子环 -->
+  <circle cx="32" cy="32" r="13.2" fill="#000"/>
+  <circle cx="32" cy="32" r="13.2" fill="none" stroke="#fff6e2" stroke-width="1.7"/>
+</svg>
