@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GARGANTUA · 卡冈图雅黑洞引力透镜实时模拟器</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three.module.min.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="canvas-container" aria-label="卡冈图雅黑洞三维引力透镜交互视窗"></div>
+
+  <!-- 左上角：标题与实时天体物理遥测面板 -->
+  <header class="hud-header">
+    <div class="brand-badge">
+      <span class="status-dot"></span>
+      <span>GENERAL RELATIVITY · GEODESIC RAYMARCHER</span>
+    </div>
+    <h1 class="hud-title">
+      GARGANTUA<span>卡冈图雅</span>
+    </h1>
+    <div class="telemetry-strip">
+      <div class="telemetry-item">
+        <span class="telemetry-label">观测距离 r / Rs</span>
+        <span class="telemetry-value accent" id="tel-distance">13.50 Rs</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">视界半径 R+</span>
+        <span class="telemetry-value" id="tel-horizon">0.72 Rs</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">光子球层 Rph</span>
+        <span class="telemetry-value" id="tel-photon">1.14 Rs</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">渲染帧率</span>
+        <span class="telemetry-value" id="tel-fps">60 FPS</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 左下角：广义相对论引力时间膨胀读数与鼠标交互提示 -->
+  <footer class="hud-footer">
+    <div class="dilation-banner">
+      <span>引力时间膨胀率 dτ/dt：<strong id="tel-dilation">0.962x</strong></span>
+      <span>·</span>
+      <span id="tel-dilation-desc">当前轨道 1 小时 ≈ 远方观测者 1.04 小时</span>
+    </div>
+    <div class="interaction-hints">
+      <div class="hint-pill"><kbd>左键拖拽</kbd>360° 环绕旋转观察</div>
+      <div class="hint-pill"><kbd>滚轮</kbd>缩放观测距离</div>
+      <div class="hint-pill"><kbd>右键拖拽</kbd>调整银幕倾角</div>
+      <div class="hint-pill"><kbd>双击画面</kbd>复位经典视角</div>
+    </div>
+  </footer>
+
+  <!-- 侧边栏折叠切换按钮 -->
+  <button id="btn-toggle-sidebar" class="sidebar-toggle" type="button" title="展开/收起参数控制面板">
+    <span id="toggle-icon">▸</span>
+    <span id="toggle-text">收起面板</span>
+  </button>
+
+  <!-- 右侧：参数调节侧边栏 -->
+  <aside class="control-sidebar" aria-label="黑洞物理与视觉参数控制面板">
+    <div class="sidebar-header">
+      <div class="sidebar-header-title">
+        <h2>黑洞物理与光学控制台</h2>
+        <p>实时调整时空曲率、吸积盘与引力透镜参数</p>
+      </div>
+      <div class="header-actions">
+        <button id="btn-auto-orbit" class="btn-action" type="button" title="开启/关闭摄像机自动环绕">自动环绕</button>
+        <button id="btn-reset" class="btn-action" type="button" title="重置为星际穿越默认参数">重置</button>
+      </div>
+    </div>
+
+    <div class="sidebar-body">
+      <!-- 1. 电影与物理场景预设 -->
+      <section class="control-section">
+        <div class="section-header">
+          <span class="section-title">快速场景预设</span>
+          <span class="section-tag">PRESETS</span>
+        </div>
+        <div class="preset-grid">
+          <button class="preset-btn active" data-preset="interstellar" type="button">
+            <span class="preset-name">星际穿越 · 经典</span>
+            <span class="preset-desc">电影级暖金吸积盘与双光环</span>
+          </button>
+          <button class="preset-btn" data-preset="kipThorne" type="button">
+            <span class="preset-name">索恩相对论模式</span>
+            <span class="preset-desc">强多普勒蓝移/红移非对称</span>
+          </button>
+          <button class="preset-btn" data-preset="einsteinRing" type="button">
+            <span class="preset-name">爱因斯坦环俯视</span>
+            <span class="preset-desc">高倾角观测光子环与星场畸变</span>
+          </button>
+          <button class="preset-btn" data-preset="photonSkim" type="button">
+            <span class="preset-name">掠过光子球层</span>
+            <span class="preset-desc">抵近事件视界边缘极端时间膨胀</span>
+          </button>
+          <button class="preset-btn" data-preset="quasar" type="button">
+            <span class="preset-name">高能蓝巨类星体</span>
+            <span class="preset-desc">11500K 高温蓝白电离吸积盘</span>
+          </button>
+          <button class="preset-btn" data-preset="nakedLens" type="button">
+            <span class="preset-name">纯引力透镜黑洞</span>
+            <span class="preset-desc">无吸积盘，纯粹背景星场爱因斯坦环</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 2. 时空曲率与黑洞核心参数 -->
+      <section class="control-section">
+        <div class="section-header">
+          <span class="section-title">时空与引力透镜</span>
+          <span class="section-tag">SPACETIME</span>
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-rs">黑洞质量 (史瓦西半径 Rs)</label>
+            <span class="param-value" id="val-rs">1.00 Rs</span>
+          </div>
+          <input id="param-rs" type="range" min="0.45" max="1.85" step="0.01" value="1.00" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-lensing">引力透镜偏折强度</label>
+            <span class="param-value" id="val-lensing">1.00x (GR)</span>
+          </div>
+          <input id="param-lensing" type="range" min="0.00" max="1.80" step="0.01" value="1.00" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-spin">克尔黑洞自旋 (a/M)</label>
+            <span class="param-value" id="val-spin">0.85c</span>
+          </div>
+          <input id="param-spin" type="range" min="0.00" max="0.99" step="0.01" value="0.85" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-photon-ring">内光子环锐度与辉光</label>
+            <span class="param-value" id="val-photon-ring">1.15</span>
+          </div>
+          <input id="param-photon-ring" type="range" min="0.00" max="2.50" step="0.05" value="1.15" />
+        </div>
+      </section>
+
+      <!-- 3. 吸积盘物理与外观参数 -->
+      <section class="control-section">
+        <div class="section-header">
+          <span class="section-title">吸积盘等离子体</span>
+          <span class="section-tag">ACCRETION DISK</span>
+        </div>
+
+        <div class="toggle-row">
+          <span class="param-label">启用吸积盘渲染</span>
+          <label class="switch">
+            <input id="param-disk-enabled" type="checkbox" checked />
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-disk-temp">吸积盘黑体色温 (T)</label>
+            <span class="param-value" id="val-disk-temp">4800 K</span>
+          </div>
+          <input id="param-disk-temp" type="range" min="2200" max="14000" step="100" value="4800" />
+          <div class="temp-gradient-bar"></div>
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-doppler">相对论多普勒聚束效应</label>
+            <span class="param-value" id="val-doppler">0.36</span>
+          </div>
+          <input id="param-doppler" type="range" min="0.00" max="1.30" step="0.02" value="0.36" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-disk-inner">吸积盘内缘半径 (Rin)</label>
+            <span class="param-value" id="val-disk-inner">2.85 Rs</span>
+          </div>
+          <input id="param-disk-inner" type="range" min="2.65" max="4.80" step="0.05" value="2.85" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-disk-outer">吸积盘外缘半径 (Rout)</label>
+            <span class="param-value" id="val-disk-outer">9.20 Rs</span>
+          </div>
+          <input id="param-disk-outer" type="range" min="4.80" max="15.00" step="0.10" value="9.20" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-disk-thickness">吸积盘垂直几何厚度</label>
+            <span class="param-value" id="val-disk-thickness">0.16 Rs</span>
+          </div>
+          <input id="param-disk-thickness" type="range" min="0.02" max="0.85" step="0.01" value="0.16" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-disk-speed">开普勒旋转角速度</label>
+            <span class="param-value" id="val-disk-speed">1.00x</span>
+          </div>
+          <input id="param-disk-speed" type="range" min="0.00" max="3.00" step="0.05" value="1.00" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-disk-detail">湍流环带纹理精细度</label>
+            <span class="param-value" id="val-disk-detail">1.00</span>
+          </div>
+          <input id="param-disk-detail" type="range" min="0.10" max="1.60" step="0.05" value="1.00" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-disk-brightness">吸积盘辐射总光度</label>
+            <span class="param-value" id="val-disk-brightness">1.35</span>
+          </div>
+          <input id="param-disk-brightness" type="range" min="0.20" max="3.00" step="0.05" value="1.35" />
+        </div>
+      </section>
+
+      <!-- 4. 背景星空与星云 -->
+      <section class="control-section">
+        <div class="section-header">
+          <span class="section-title">背景星空与深空星云</span>
+          <span class="section-tag">COSMOS</span>
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-star-density">背景恒星密度</label>
+            <span class="param-value" id="val-star-density">1.20x</span>
+          </div>
+          <input id="param-star-density" type="range" min="0.10" max="2.50" step="0.05" value="1.20" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-star-brightness">恒星亮度与透镜增亮</label>
+            <span class="param-value" id="val-star-brightness">1.30x</span>
+          </div>
+          <input id="param-star-brightness" type="range" min="0.00" max="3.00" step="0.05" value="1.30" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-nebula">银河尘埃带与星云强度</label>
+            <span class="param-value" id="val-nebula">1.00x</span>
+          </div>
+          <input id="param-nebula" type="range" min="0.00" max="2.50" step="0.05" value="1.00" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-sky-drift">天球背景星流速度</label>
+            <span class="param-value" id="val-sky-drift">0.15x</span>
+          </div>
+          <input id="param-sky-drift" type="range" min="0.00" max="1.50" step="0.05" value="0.15" />
+        </div>
+      </section>
+
+      <!-- 5. IMAX 电影级光学与渲染性能 -->
+      <section class="control-section">
+        <div class="section-header">
+          <span class="section-title">电影光学与渲染性能</span>
+          <span class="section-tag">OPTICS &amp; GPU</span>
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-bloom">散射辉光强度 (Bloom)</label>
+            <span class="param-value" id="val-bloom">0.85</span>
+          </div>
+          <input id="param-bloom" type="range" min="0.00" max="2.20" step="0.05" value="0.85" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-anamorphic">IMAX 变形宽银幕横向眩光</label>
+            <span class="param-value" id="val-anamorphic">0.55</span>
+          </div>
+          <input id="param-anamorphic" type="range" min="0.00" max="1.80" step="0.05" value="0.55" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-roll">银幕镜头倾角 (Roll)</label>
+            <span class="param-value" id="val-roll">-16°</span>
+          </div>
+          <input id="param-roll" type="range" min="-90" max="90" step="1" value="-16" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-fov">镜头视野角度 (FOV)</label>
+            <span class="param-value" id="val-fov">46°</span>
+          </div>
+          <input id="param-fov" type="range" min="24" max="85" step="1" value="46" />
+        </div>
+
+        <div class="param-row">
+          <div class="param-top">
+            <label class="param-label" for="param-quality">光线步进精度与分辨率</label>
+            <span class="param-value" id="val-quality">0.85x</span>
+          </div>
+          <input id="param-quality" type="range" min="0.45" max="1.20" step="0.05" value="0.85" />
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <script type="module" src="./main.js?v=6"></script>
+</body>
+</html>
