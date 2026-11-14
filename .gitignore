@@ -18,3 +18,6 @@ desktop.ini
 node_modules/
 dist/
 build/
+
+# e2e run output
+.e2e/
