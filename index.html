@@ -18,7 +18,7 @@
 <canvas id="glcanvas" aria-label="黑洞实时渲染画布"></canvas>
 
 <!-- ======================================================================
-     首屏加载遮罩（BH.ui.hideLoading() 移除，6 秒后自动移除）
+     首屏加载遮罩（第一帧画出后由 BH.ui.hideLoading() 移除）
      ==================================================================== -->
 <div id="loading" role="status" aria-live="polite">
   <div class="loading-inner">
@@ -27,9 +27,9 @@
       <span class="loading-glyph">◍</span>
     </div>
     <h1 class="loading-title">GARGANTUA</h1>
-    <p class="loading-sub">卡冈图雅 · 正在构建引力场</p>
+    <p class="loading-sub">卡冈图雅 · 正在准备第一帧</p>
     <div class="loading-rule" aria-hidden="true"><i></i></div>
-    <p class="loading-note">COMPILING SHADERS · TRACING NULL GEODESICS</p>
+    <p class="loading-note">拖动旋转 · 滚轮缩放 · 双击复位</p>
   </div>
 </div>
 
@@ -55,6 +55,7 @@
     <div class="brand">
       <h1 class="brand-title">GARGANTUA</h1>
       <p class="brand-sub">卡冈图雅 · 实时黑洞可视化</p>
+      <p class="brand-help">拖动画布旋转，滚轮缩放，或点下面的预设。</p>
     </div>
     <span class="brand-rule" aria-hidden="true"></span>
   </header>
@@ -86,21 +87,25 @@
 <!-- 窄屏抽屉遮罩 -->
 <div id="sidebar-scrim" aria-hidden="true"></div>
 
+<!-- 操作反馈。必须放在侧栏外：侧栏有 transform，里面的 fixed 会变成相对侧栏定位 -->
+<p id="action-status" class="action-status" role="status" aria-live="polite"></p>
+
 <!-- ======================================================================
      HUD 遥测
      ==================================================================== -->
 <div id="hud" aria-live="off">
   <div class="hud-grid">
-    <span class="hud-k">FPS</span>
+    <span class="hud-k">帧率</span>
     <span class="hud-v" id="hud-fps">—</span>
 
-    <span class="hud-k">内部渲染分辨率</span>
+    <span class="hud-k">分辨率</span>
     <span class="hud-v" id="hud-res">—</span>
 
-    <span class="hud-k">累积帧数</span>
+    <span class="hud-k">锐化</span>
     <span class="hud-v" id="hud-samples">0/64</span>
   </div>
-  <p class="hud-hint">拖动旋转 · 滚轮缩放 · 双击重置视角</p>
+  <p class="hud-hint">拖动旋转 · 滚轮缩放 · 双击复位</p>
+  <p id="hud-note" class="hud-note" role="status" hidden></p>
 </div>
 
 <noscript>

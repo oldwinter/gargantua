@@ -23,7 +23,7 @@
    *  1. 常量
    * ----------------------------------------------------------------------- */
   var HUD_MIN_INTERVAL = 250;        /* ms —— HUD 最高约 4 次/秒的 DOM 写入 */
-  var LOADING_AUTOHIDE_MS = 6000;    /* 首屏遮罩最长存活时间 */
+  var LOADING_AUTOHIDE_MS = 20000;   /* 着色器编译可能较久，超时只是兜底 */
   var LOADING_FADE_MS = 260;         /* 与 CSS --t-slow 对齐 */
   var FLASH_MS = 600;                /* 预设高亮闪烁时长 */
   var NARROW_MQ = '(max-width: 819px)';
@@ -159,6 +159,8 @@
     hudFps: null,
     hudRes: null,
     hudSamples: null,
+    hudNote: null,
+    status: null,
     error: null,
     errorTitle: null,
     errorDetail: null,
@@ -176,10 +178,12 @@
   var pendingError = null;     /* init 之前就调用了 showError */
   var loadingTimer = 0;
   var flashTimer = 0;
+  var statusTimer = 0;
+  var presetButtons = [];
   var unsub = null;
   var initialized = false;
 
-  var hudData = { fps: null, width: null, height: null, samples: null, maxSamples: 64 };
+  var hudData = { fps: null, width: null, height: null, samples: null, maxSamples: 64, moving: false, note: '' };
   var hudDirty = false;
   var hudTimer = 0;
   var hudLastWrite = 0;
@@ -409,6 +413,7 @@
 
     resetBtn.addEventListener('click', function () {
       BH.resetGroup(group.id);
+      showStatus('已恢复「' + group.title + '」');
     });
 
     return section;
@@ -499,27 +504,71 @@
     }, FLASH_MS + 40);
   }
 
+  function presetMatches(values) {
+    if (!BH || !BH.state || !values) return false;
+    for (var k in values) {
+      if (!Object.prototype.hasOwnProperty.call(values, k)) continue;
+      var cur = BH.state[k];
+      var want = values[k];
+      if (typeof cur === 'number' && typeof want === 'number') {
+        if (Math.abs(cur - want) > 1e-6) return false;
+      } else if (cur !== want) return false;
+    }
+    return true;
+  }
+
+  function refreshPresetActive() {
+    for (var i = 0; i < presetButtons.length; i++) {
+      var item = presetButtons[i];
+      var on = presetMatches(item.values);
+      item.btn.classList.toggle('is-active', on);
+      item.btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  }
+
+  function showStatus(text) {
+    if (!dom.status) dom.status = $('action-status');
+    if (!dom.status) return;
+    dom.status.textContent = text || '';
+    if (statusTimer) window.clearTimeout(statusTimer);
+    statusTimer = 0;
+    if (!text) return;
+    statusTimer = window.setTimeout(function () {
+      statusTimer = 0;
+      if (dom.status && dom.status.textContent === text) dom.status.textContent = '';
+    }, 5200);
+  }
+
   function applyPreset(values) {
     if (!values) return;
     if (typeof BH.setMany === 'function') BH.setMany(values);
     flashHead();
+    refreshPresetActive();
   }
 
   function renderPresets(list) {
     if (!dom.presets) return;
     dom.presets.textContent = '';
+    presetButtons = [];
 
     for (var i = 0; i < list.length; i++) {
       var p = list[i];
       if (!p || !p.values) continue;
-      var btn = el('button', 'preset-btn', p.label || p.id || ('预设 ' + (i + 1)));
+      var label = p.label || p.id || ('预设 ' + (i + 1));
+      var btn = el('button', 'preset-btn', label);
       btn.type = 'button';
-      btn.setAttribute('aria-label', '应用预设：' + (p.label || p.id));
-      (function (values) {
-        btn.addEventListener('click', function () { applyPreset(values); });
-      })(p.values);
+      btn.setAttribute('aria-pressed', 'false');
+      btn.setAttribute('aria-label', '应用预设：' + label);
+      (function (values, name) {
+        btn.addEventListener('click', function () {
+          applyPreset(values);
+          showStatus('已换成「' + name + '」');
+        });
+      })(p.values, label);
+      presetButtons.push({ btn: btn, values: p.values });
       dom.presets.appendChild(btn);
     }
+    refreshPresetActive();
   }
 
   /* -------------------------------------------------------------------------
@@ -557,8 +606,15 @@
         ? Math.round(hudData.maxSamples) : 64;
       var s = (typeof hudData.samples === 'number' && isFinite(hudData.samples))
         ? Math.max(0, Math.min(maxS, Math.round(hudData.samples))) : 0;
-      var sText = s + '/' + maxS;
+      /* 镜头在动时累积会被清掉，1/64 看起来像坏了，改说人话 */
+      var sText = hudData.moving ? '跟随中' : (s + '/' + maxS);
       if (dom.hudSamples.textContent !== sText) dom.hudSamples.textContent = sText;
+    }
+
+    if (dom.hudNote) {
+      var note = hudData.note || '';
+      if (dom.hudNote.textContent !== note) dom.hudNote.textContent = note;
+      dom.hudNote.hidden = !note;
     }
   }
 
@@ -588,6 +644,8 @@
     if (typeof info.maxSamples === 'number' && isFinite(info.maxSamples) && info.maxSamples > 0) {
       hudData.maxSamples = info.maxSamples;
     }
+    if (typeof info.moving === 'boolean') hudData.moving = info.moving;
+    if (typeof info.note === 'string') hudData.note = info.note;
     hudDirty = true;
     scheduleHud();
   }
@@ -693,6 +751,15 @@
       dom.toggle.setAttribute('aria-label', collapsed ? '展开参数面板' : '收起参数面板');
     }
     if (persist) lsSet(LS_SIDEBAR, collapsed ? '1' : '0');
+    /* 宽屏展开时等侧栏盖住后再缩小画布，避免先露出一条空带 */
+    notifyLayout(collapsed);
+  }
+
+  function notifyLayout(collapsed) {
+    var delay = (!collapsed && !isNarrow()) ? 260 : 0;
+    window.setTimeout(function () {
+      window.dispatchEvent(new Event('bh:layout'));
+    }, delay);
   }
 
   function toggleSidebar() {
@@ -738,6 +805,8 @@
     dom.hudFps = $('hud-fps');
     dom.hudRes = $('hud-res');
     dom.hudSamples = $('hud-samples');
+    dom.hudNote = $('hud-note');
+    dom.status = $('action-status');
     dom.error = $('error-overlay');
     dom.errorTitle = $('error-title');
     dom.errorDetail = $('error-detail');
@@ -773,6 +842,7 @@
     if (dom.resetAll) {
       dom.resetAll.addEventListener('click', function () {
         BH.reset();
+        showStatus('已恢复默认');
       });
     }
 
@@ -818,11 +888,11 @@
   function wireContract() {
     if (typeof BH.subscribe !== 'function') return;
     unsub = BH.subscribe(function (changed) {
-      if (!changed || !changed.length) {
-        syncAll();
-        return;
+      if (!changed || !changed.length) syncAll();
+      else {
+        for (var i = 0; i < changed.length; i++) syncOne(changed[i]);
       }
-      for (var i = 0; i < changed.length; i++) syncOne(changed[i]);
+      refreshPresetActive();
     });
   }
 
@@ -890,6 +960,7 @@
     if (loadingTimer) { window.clearTimeout(loadingTimer); loadingTimer = 0; }
     if (hudTimer) { window.clearTimeout(hudTimer); hudTimer = 0; }
     if (flashTimer) { window.clearTimeout(flashTimer); flashTimer = 0; }
+    if (statusTimer) { window.clearTimeout(statusTimer); statusTimer = 0; }
   }
 
   window.BH = window.BH || {};

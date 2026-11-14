@@ -136,6 +136,14 @@ h1, h2, p { margin: 0; }
 
 #glcanvas:active { cursor: grabbing; }
 
+/* 宽屏侧栏打开时，画面只占剩余区域，吸积盘不会被面板裁掉 */
+@media (min-width: 820px) {
+  body:not(.sidebar-collapsed) #glcanvas {
+    width: calc(100% - var(--sbw));
+    right: auto;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    4. 全屏氛围层：暗角 + 胶片颗粒（纯装饰，绝不拦截指针）
    ------------------------------------------------------------------------- */
@@ -296,6 +304,14 @@ body.sidebar-collapsed #sidebar {
   color: var(--muted);
 }
 
+.brand-help {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.55;
+  letter-spacing: 0.01em;
+  color: var(--text-dim);
+}
+
 .brand-rule {
   display: block;
   height: 1px;
@@ -336,6 +352,34 @@ body.sidebar-collapsed #sidebar {
   padding: 14px var(--pad-x) 18px;
   border-top: 1px solid var(--hair-soft);
   background: linear-gradient(180deg, rgba(6, 7, 11, 0) 0%, rgba(6, 7, 11, 0.55) 100%);
+}
+
+/* 浮在画面上，不把底部预设挤出屏幕 */
+.action-status {
+  position: fixed;
+  z-index: 30;
+  top: 22px;
+  left: 20px;
+  margin: 0;
+  padding: 8px 12px;
+  max-width: min(280px, calc(100vw - 40px));
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  color: #ffe7c4;
+  font-weight: 600;
+  background: rgba(32, 22, 12, 0.94);
+  border: 1px solid rgba(255, 210, 161, 0.85);
+  box-shadow: 0 12px 32px -18px rgba(0, 0, 0, 0.95);
+  pointer-events: none;
+}
+
+.action-status:empty { display: none; }
+
+@media (max-width: 819px) {
+  /* 窄屏抽屉几乎铺满，反馈交给被点亮的预设按钮 */
+  body:not(.sidebar-collapsed) .action-status { display: none; }
 }
 
 .preset-block { margin-top: 14px; }
@@ -432,6 +476,13 @@ body.sidebar-collapsed #sidebar {
 }
 
 .preset-btn:active { transform: translateY(1px); }
+
+.preset-btn[aria-pressed="true"] {
+  color: #201404;
+  border-color: rgba(255, 210, 161, 0.85);
+  background: linear-gradient(180deg, var(--amber-hi) 0%, var(--amber) 100%);
+  font-weight: 600;
+}
 
 /* ---------------------------------------------------------------------------
    7. 分组
@@ -541,6 +592,13 @@ body.sidebar-collapsed #sidebar {
 /* 触摸设备没有 hover：始终显示重置按钮 */
 @media (hover: none) {
   .group-reset { opacity: 0.55; }
+
+  /* 触摸屏没有悬停，参数说明必须直接可见 */
+  .hint {
+    max-height: 132px;
+    margin-top: 7px;
+    opacity: 1;
+  }
 }
 
 .group-reset:hover {
@@ -965,11 +1023,21 @@ body.sidebar-collapsed .toggle-icon {
   margin-top: 9px;
   padding-top: 8px;
   border-top: 1px solid var(--hair-soft);
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  color: var(--muted-deep);
-  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
 }
+
+.hud-note {
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  color: var(--amber-hi);
+}
+
+.hud-note[hidden] { display: none; }
 
 /* ---------------------------------------------------------------------------
    14. 加载遮罩
@@ -1085,10 +1153,9 @@ body.sidebar-collapsed .toggle-icon {
 }
 
 .loading-note {
-  font-family: var(--font-num);
-  font-size: 9.5px;
-  letter-spacing: 0.24em;
-  color: var(--muted-deep);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
 }
 
 /* ---------------------------------------------------------------------------
@@ -1205,10 +1272,11 @@ body.sidebar-collapsed .toggle-icon {
   #hud {
     left: 12px;
     bottom: 12px;
+    max-width: calc(100% - 78px);
     padding: 9px 11px 8px;
   }
 
-  .hud-hint { display: none; }
+  .hud-hint { white-space: normal; }
 
   /* 抽屉展开时，右上角悬浮按钮会压住标题区，给头部预留空间 */
   .sidebar-head { padding-right: 62px; }

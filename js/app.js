@@ -23,7 +23,40 @@
     highFpsStreak: 0,
     lastQualityRebuild: 0,
     errors: [],
+    presented: false,
+    hudNote: '',
+    hudNoteUntil: 0,
   };
+
+  function viewIsMoving(cam) {
+    if (!cam) return false;
+    if (cam.userInteracting || cam.target) return true;
+    if (Math.abs(cam.velAzimuth) > 1e-4 || Math.abs(cam.velPolar) > 1e-4) return true;
+    /* 闲置后的自动环绕每帧都在改方位角，锐化计数会一直停在 1 */
+    if (cam.autoRotate && cam.idleTimer > 2.2) return true;
+    return false;
+  }
+
+  function isNarrowViewport() {
+    return window.matchMedia('(max-width: 819px)').matches;
+  }
+
+  /* 宽屏侧栏打开时，画布只使用没被面板挡住的宽度，黑洞才能完整入画 */
+  function layoutSize() {
+    let w = window.innerWidth;
+    const h = window.innerHeight;
+    if (!isNarrowViewport() && !document.body.classList.contains('sidebar-collapsed')) {
+      const sb = document.getElementById('sidebar');
+      const sbw = sb ? sb.getBoundingClientRect().width : 340;
+      if (sbw > 40) w = Math.max(320, Math.round(w - sbw));
+    }
+    return { w: Math.max(2, Math.round(w)), h: Math.max(2, Math.round(h)) };
+  }
+
+  function setHudNote(text, ms) {
+    state.hudNote = text || '';
+    state.hudNoteUntil = text ? performance.now() + (ms || 5000) : 0;
+  }
 
   /* ---------------------------------------------------------------------- */
   function detectDPR() {
@@ -64,12 +97,14 @@
     const r = state.renderer;
     const c = state.canvas;
     if (!r || !c) return;
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    r.setRenderScale(window.BH ? window.BH.state.renderScale : 0.85);
-    r.resize(w, h, detectDPR());
+    const box = layoutSize();
+    const w = box.w;
+    const h = box.h;
+    /* 先改布局，再重建显存。重建会卡住主线程，不能让画面尺寸滞后。 */
     c.style.width = w + 'px';
     c.style.height = h + 'px';
+    r.setRenderScale(window.BH ? window.BH.state.renderScale : 0.85);
+    r.resize(w, h, detectDPR());
   }
 
   /* ---------------------------------------------------------------------- */
@@ -92,18 +127,28 @@
 
     const cur = state.renderer.renderScale;
 
-    if (state.lowFpsStreak > 1.4 && cur > 0.45) {
+    if (state.lowFpsStreak > 1.4 && cur > 0.451) {
       state.lowFpsStreak = 0;
-      const next = Math.max(0.45, cur - 0.1);
-      state.renderer.setRenderScale(next);
-      if (window.BH) window.BH.set('renderScale', next);
-      console.info('[GARGANTUA] 自动降低分辨率 →', next.toFixed(2));
-    } else if (state.highFpsStreak > 3.0 && cur < 1.0) {
+      const next = Math.max(0.45, Math.round((cur - 0.1) * 100) / 100);
+      if (next < cur - 0.01) {
+        state.renderer.setRenderScale(next);
+        if (window.BH) window.BH.set('renderScale', next);
+        if (state.renderer.renderScale < cur - 0.01) {
+          setHudNote('画面偏慢，清晰度已自动降低');
+          console.info('[GARGANTUA] 自动降低分辨率 →', state.renderer.renderScale.toFixed(2));
+        }
+      }
+    } else if (state.highFpsStreak > 3.0 && cur < 0.99) {
       state.highFpsStreak = 0;
-      const next = Math.min(1.0, cur + 0.05);
-      state.renderer.setRenderScale(next);
-      if (window.BH) window.BH.set('renderScale', next);
-      console.info('[GARGANTUA] 自动提升分辨率 →', next.toFixed(2));
+      const next = Math.min(1.0, Math.round((cur + 0.05) * 100) / 100);
+      if (next > cur + 0.01) {
+        state.renderer.setRenderScale(next);
+        if (window.BH) window.BH.set('renderScale', next);
+        if (state.renderer.renderScale > cur + 0.01) {
+          setHudNote('帧率回升，清晰度已自动提高');
+          console.info('[GARGANTUA] 自动提升分辨率 →', state.renderer.renderScale.toFixed(2));
+        }
+      }
     }
   }
 
@@ -128,12 +173,20 @@
     /* ---- 渲染 ---- */
     const r = state.renderer;
     if (r) {
+      const frameBefore = r.frame || 0;
       try {
         r.render(dt);
       } catch (err) {
         state.running = false;
         showFatal('渲染循环出错', err && err.message ? err.message : String(err));
         return;
+      }
+      /* 第一帧真正画出来再揭开遮罩，避免先看到一块空背景 */
+      if (!state.presented && r.frame > frameBefore) {
+        state.presented = true;
+        if (window.BH.ui && typeof window.BH.ui.hideLoading === 'function') {
+          window.BH.ui.hideLoading();
+        }
       }
     }
 
@@ -153,6 +206,7 @@
     if (state.hudAccum >= 0.25) {
       state.hudAccum = 0;
       const info = r ? r.getInfo() : null;
+      if (state.hudNote && performance.now() > state.hudNoteUntil) state.hudNote = '';
       if (window.BH && window.BH.ui && typeof window.BH.ui.setHud === 'function') {
         window.BH.ui.setHud({
           fps: state.fps,
@@ -160,6 +214,8 @@
           height: info ? info.sceneHeight : 0,
           samples: r ? r.sampleCount : 0,
           maxSamples: state.maxSamples,
+          moving: viewIsMoving(state.camera),
+          note: state.hudNote,
         });
       }
     }
@@ -240,10 +296,13 @@
 
     /* ---- 窗口事件 ---- */
     let resizeTimer = 0;
-    window.addEventListener('resize', () => {
+    const onLayout = () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(resize, 90);
-    });
+    };
+    window.addEventListener('resize', onLayout);
+    /* 侧栏开合不冒充 window resize，否则窄屏会立刻把刚打开的抽屉关掉 */
+    window.addEventListener('bh:layout', onLayout);
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
@@ -262,13 +321,6 @@
     state.running = true;
     state.lastTime = performance.now();
     requestAnimationFrame(loop);
-
-    /* 隐藏加载层（给 UI 一点时间淡出） */
-    setTimeout(() => {
-      if (window.BH.ui && typeof window.BH.ui.hideLoading === 'function') {
-        window.BH.ui.hideLoading();
-      }
-    }, 320);
 
     /* ---- 对外暴露 ---- */
     window.BH.app = {
@@ -299,9 +351,28 @@
   }
 
   /* ---------------------------------------------------------------------- */
+  /* 先让加载页画出来，再进入会卡住主线程的着色器编译 */
+  function start() {
+    const ready = document.getElementById('glcanvas')
+      && window.BH && window.OrbitCamera
+      && window.GargantuaRenderer && window.SHADERS;
+    if (!ready) {
+      init();
+      return;
+    }
+    const sub = document.querySelector('.loading-sub');
+    if (sub) sub.textContent = '正在编译着色器，第一次会稍等一会儿';
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        /* 让说明在编译卡住主线程之前先被看见 */
+        setTimeout(init, 700);
+      });
+    });
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', start);
   } else {
-    init();
+    start();
   }
 })();
